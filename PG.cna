@@ -1,0 +1,28 @@
+# Payload Generator
+# Reference: https://github.com/offsecginger/AggressorScripts
+
+# C# Payload Templates
+#	C# CreateThread method
+#		Creates an executable that loads shellcode via CreateThread
+
+# Add Payload Generator to menubar
+menubar("Payload Generator", "morepayloads", 2);
+popup morepayloads {
+
+	menu "&Generate Payload" {
+		# Include a new menu for each template added and load different script
+
+		item "&C# CreateThread" {
+		@aggressor = ('./aggressors/PG/scripts/createthread_va.cna');
+		if (substr(cwd(), 0, 1) eq "/") {
+			# OS is linux
+			}
+		else {
+			#OS is windows
+			$aggressor = strrep($aggressor, "/", "\\")
+			}
+		include(@aggressor);
+		}		
+	}
+}
+
