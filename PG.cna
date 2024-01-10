@@ -23,6 +23,18 @@ popup morepayloads {
 			}
 		include(@aggressor);
 		}		
+		
+		item "&C# CreateRemoteThread" {
+		@aggressor = ('./aggressors/PG/scripts/createremotethread.cna');
+		if (substr(cwd(), 0, 1) eq "/") {
+			# OS is linux
+			}
+		else {
+			#OS is windows
+			$aggressor = strrep($aggressor, "/", "\\")
+			}
+		include(@aggressor);
+		}
 	}
 }
 
