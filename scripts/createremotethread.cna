@@ -22,7 +22,7 @@ else {
 
 # Generate Payloads submenu
 sub gen_payload {
-	$dialog = dialog("Custom payload Generator - CreateRemoteThread", %(listener => "Select Listener: ", payload_type => "Delivery: ", template => "Template: ", target_net => "v4.8", assembly_name => "payload_createthread"), &templates);
+	$dialog = dialog("Custom payload Generator - CreateRemoteThread", %(listener => "Select Listener: ", payload_type => "Delivery: ", template => "Template: ", target_net => "v4.8", assembly_name => "payload_createremotethread"), &templates);
 	dialog_description($dialog, "Creates an exe that runs shellcode using CreateRemoteThread");
 	drow_listener_stage($dialog, "listener", "Listener: ");
 	drow_combobox($dialog, "payload_type", "Delivery: ", @("Stageless"));
